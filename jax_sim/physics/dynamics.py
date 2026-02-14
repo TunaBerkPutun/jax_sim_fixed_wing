@@ -10,22 +10,18 @@ Updated to use PX4 SIH-style aerodynamic model with proper:
 import jax
 import jax.numpy as jnp
 
-from jax_sim.physics.constants import (
-    G,
-    MASS,
-    Inertia,
-    Inertia_inv,
-    TAU_MOTOR,
-    FLAP_MAX,
-    MAX_BODY_RATE,
-    T_MAX,
-)
+from jax_sim.physics.aircraft import AircraftParams, DEFAULT_AIRCRAFT
 from jax_sim.physics.aerodynamics import compute_fixed_wing_aero
+from jax_sim.physics.rigid_body import rigid_body_step
 from jax_sim.utils.quaternion import rotate_vec_by_quat, quat_inv
 
 
 @jax.jit
-def get_forces_and_moments(state, current_actuators):
+def compute_aircraft_forces_moments(
+    state,
+    current_actuators,
+    aircraft: AircraftParams = DEFAULT_AIRCRAFT,
+):
     """Compute total aerodynamic forces and moments.
 
     Uses PX4 SIH-style aerodynamic segment model with:
@@ -40,6 +36,7 @@ def get_forces_and_moments(state, current_actuators):
         current_actuators: [aileron, elevator, rudder, throttle]
                           - aileron/elevator/rudder in radians
                           - throttle in 0-1
+        aircraft: Aircraft configuration (segments, limits, propulsion)
 
     Returns:
         Total_F_body: Total force in body frame [Fx, Fy, Fz] [N]
@@ -56,9 +53,10 @@ def get_forces_and_moments(state, current_actuators):
 
     # Actuators (radians for surfaces, 0-1 for throttle)
     # Convert radians back to normalized [-1, 1] for new aero model
-    aileron_norm = current_actuators[0] / FLAP_MAX
-    elevator_norm = current_actuators[1] / FLAP_MAX
-    rudder_norm = current_actuators[2] / FLAP_MAX
+    flap_max = aircraft.actuators.flap_max
+    aileron_norm = current_actuators[0] / flap_max
+    elevator_norm = current_actuators[1] / flap_max
+    rudder_norm = current_actuators[2] / flap_max
     throttle = current_actuators[3]
 
     # Compute aerodynamic forces and moments using full segment model
@@ -72,10 +70,11 @@ def get_forces_and_moments(state, current_actuators):
         rudder=rudder_norm,
         throttle=throttle,
         altitude=altitude,
+        aircraft=aircraft,
     )
 
     # Thrust force (body frame, forward)
-    Thrust_Force = jnp.array([throttle * T_MAX, 0.0, 0.0])
+    Thrust_Force = jnp.array([throttle * aircraft.propulsion.t_max, 0.0, 0.0])
 
     # Total force and moment (body frame)
     # Note: No KDV/KDW damping - handled by aerodynamic model
@@ -86,13 +85,51 @@ def get_forces_and_moments(state, current_actuators):
 
 
 @jax.jit
-def equations_of_motion(state, user_commands, dt=0.004):
+def get_forces_and_moments(
+    state,
+    current_actuators,
+    aircraft: AircraftParams = DEFAULT_AIRCRAFT,
+):
+    """Backwards-compatible wrapper for aircraft-specific forces/moments."""
+    return compute_aircraft_forces_moments(state, current_actuators, aircraft)
+
+
+@jax.jit
+def update_actuators(
+    current_actuators: jnp.ndarray,
+    user_commands: jnp.ndarray,
+    dt: float,
+    aircraft: AircraftParams = DEFAULT_AIRCRAFT,
+) -> jnp.ndarray:
+    """Map user commands to actuator states with limits and lag."""
+    flap_max = aircraft.actuators.flap_max
+    target_actuators = jnp.array(
+        [
+            user_commands[0] * flap_max,  # Aileron
+            user_commands[1] * flap_max,  # Elevator
+            user_commands[2] * flap_max,  # Rudder
+            jnp.clip(user_commands[3], 0.0, 1.0),  # Throttle
+        ]
+    )
+    alpha_lag = dt / aircraft.actuators.tau_motor
+    throttle = current_actuators[3] + alpha_lag * (target_actuators[3] - current_actuators[3])
+    return jnp.concatenate([target_actuators[:3], jnp.array([throttle])])
+
+
+@jax.jit
+def equations_of_motion(
+    state,
+    user_commands,
+    dt: float = 0.004,
+    aircraft: AircraftParams = DEFAULT_AIRCRAFT,
+):
     """Simulate one timestep of the aircraft dynamics.
 
     Args:
         state: [pos(3), vel(3), quat(4), omega(3), actuators(4)] -> size: 17
         user_commands: [ail_cmd, ele_cmd, rud_cmd, thr_cmd] (-1 to 1)
         dt: Timestep (seconds)
+        aircraft: Aircraft configuration (mass, inertia, limits)
 
     Returns:
         next_state: Updated state vector
@@ -104,69 +141,33 @@ def equations_of_motion(state, user_commands, dt=0.004):
     current_actuators = state[13:17]
 
     # Compute forces
-    F_body, M_body, v_body = get_forces_and_moments(state, current_actuators)
-
-    # 1. Linear acceleration (Newton F=ma)
-    # Rotate F_body to earth frame and add gravity
-    F_earth = rotate_vec_by_quat(quat, F_body)
-    F_gravity = jnp.array([0.0, 0.0, MASS * G])  # NED: down is +Z
-
-    accel_earth = (F_earth + F_gravity) / MASS
-
-    # 2. Angular acceleration (Euler's rotation equations)
-    # I * dw/dt + w x (I * w) = M
-    # dw/dt = I_inv * (M - w x (I * w))
-    term_gyroscopic = jnp.cross(omega, Inertia @ omega)
-    angular_accel = Inertia_inv @ (M_body - term_gyroscopic)
-
-    # 3. Integration (Euler method - fast enough for RL)
-    # Position
-    new_pos = pos + vel * dt
-    # Velocity
-    new_vel = vel + accel_earth * dt
-    # Angular rate
-    new_omega = omega + angular_accel * dt
-    # Clamp body rates (PX4 SIH)
-    new_omega = jnp.clip(new_omega, -MAX_BODY_RATE, MAX_BODY_RATE)
-
-    # Quaternion integration via axis-angle
-    omega_norm = jnp.linalg.norm(new_omega)
-    angle = omega_norm * dt
-    half_angle = 0.5 * angle
-    safe_norm = jnp.where(omega_norm > 1e-8, omega_norm, 1.0)
-    axis = new_omega / safe_norm
-    axis = jnp.where(omega_norm > 1e-8, axis, jnp.zeros(3))
-    dq = jnp.concatenate([
-        jnp.array([jnp.cos(half_angle)]),
-        axis * jnp.sin(half_angle),
-    ])
-    # Quaternion multiply: q_new = q * dq
-    w1, x1, y1, z1 = quat
-    w2, x2, y2, z2 = dq
-    new_quat = jnp.array([
-        w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
-        w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
-        w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
-        w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
-    ])
-    # Normalize quaternion with NaN guard
-    quat_norm = jnp.linalg.norm(new_quat)
-    quat_norm = jnp.maximum(quat_norm, 1e-8)  # Prevent division by zero
-    new_quat = new_quat / quat_norm
-
-    # Map commands to physical limits
-    target_actuators = jnp.array(
-        [
-            user_commands[0] * FLAP_MAX,  # Aileron
-            user_commands[1] * FLAP_MAX,  # Elevator
-            user_commands[2] * FLAP_MAX,  # Rudder
-            jnp.clip(user_commands[3], 0.0, 1.0),  # Throttle
-        ]
+    F_body, M_body, v_body = compute_aircraft_forces_moments(
+        state,
+        current_actuators,
+        aircraft=aircraft,
     )
-    # Fixed-wing behavior: immediate control surfaces, lagged throttle
-    alpha_lag = dt / TAU_MOTOR
-    throttle = current_actuators[3] + alpha_lag * (target_actuators[3] - current_actuators[3])
-    new_actuators = jnp.concatenate([target_actuators[:3], jnp.array([throttle])])
+
+    # Rigid-body integration (physics-only)
+    new_pos, new_vel, new_quat, new_omega = rigid_body_step(
+        pos=pos,
+        vel=vel,
+        quat=quat,
+        omega=omega,
+        F_body=F_body,
+        M_body=M_body,
+        dt=dt,
+        mass_props=aircraft.mass_props,
+        environment=aircraft.environment,
+        max_body_rate=aircraft.actuators.max_body_rate,
+    )
+
+    # Aircraft-specific actuator dynamics
+    new_actuators = update_actuators(
+        current_actuators=current_actuators,
+        user_commands=user_commands,
+        dt=dt,
+        aircraft=aircraft,
+    )
 
     # Pack state
     next_state = jnp.concatenate([new_pos, new_vel, new_quat, new_omega, new_actuators])

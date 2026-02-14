@@ -14,8 +14,12 @@ from jax_sim.controllers.tuning.loss import (
     config_to_rate_params,
     evaluate_rate_config,
 )
-from jax_sim.physics.constants import FLAP_MAX, Inertia, Inertia_inv
+from jax_sim.physics.aircraft import DEFAULT_AIRCRAFT
 from jax_sim.physics.dynamics import get_forces_and_moments
+
+FLAP_MAX = DEFAULT_AIRCRAFT.actuators.flap_max
+INERTIA = DEFAULT_AIRCRAFT.mass_props.inertia
+INERTIA_INV = DEFAULT_AIRCRAFT.mass_props.inertia_inv
 
 
 def _trim_state(throttle_cmd: float) -> jnp.ndarray:
@@ -33,8 +37,8 @@ def _omega_dot(state: jnp.ndarray, actuators: jnp.ndarray) -> jnp.ndarray:
     """Continuous-time angular acceleration from state and actuators."""
     _, M_body, _ = get_forces_and_moments(state, actuators)
     omega = state[10:13]
-    term_gyroscopic = jnp.cross(omega, Inertia @ omega)
-    return Inertia_inv @ (M_body - term_gyroscopic)
+    term_gyroscopic = jnp.cross(omega, INERTIA @ omega)
+    return INERTIA_INV @ (M_body - term_gyroscopic)
 
 
 def _rate_dynamics_from_linearization(

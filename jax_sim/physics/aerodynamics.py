@@ -15,15 +15,8 @@ from typing import Tuple
 import jax
 import jax.numpy as jnp
 
-from jax_sim.physics.constants import (
-    RHO,
-    WING_LEFT,
-    WING_RIGHT,
-    TAILPLANE,
-    FIN,
-    FUSELAGE,
-    T_MAX,
-)
+from jax_sim.physics.aircraft import AircraftParams, DEFAULT_AIRCRAFT
+from jax_sim.physics.constants import RHO
 from jax_sim.physics.aero_segment import compute_segment_forces
 
 
@@ -36,6 +29,7 @@ def compute_fixed_wing_aero(
     rudder: float,
     throttle: float,
     altitude: float = 0.0,
+    aircraft: AircraftParams = DEFAULT_AIRCRAFT,
 ) -> Tuple[jnp.ndarray, jnp.ndarray]:
     """Compute total aerodynamic forces and moments for fixed-wing aircraft.
 
@@ -53,39 +47,46 @@ def compute_fixed_wing_aero(
         rudder: Rudder deflection [-1, 1] normalized
         throttle: Throttle [0, 1] normalized
         altitude: Altitude above sea level [m]
+        aircraft: Aircraft configuration (segments, limits, propulsion)
 
     Returns:
         Tuple of:
             F_aero: Total aerodynamic force in body frame [Fx, Fy, Fz] [N]
             M_aero: Total aerodynamic moment in body frame [Mx, My, Mz] [Nm]
     """
-    # Convert normalized commands to radians (FLAP_MAX = 15 deg)
-    FLAP_MAX = jnp.deg2rad(15.0)
-    ail_rad = aileron * FLAP_MAX
-    ele_rad = elevator * FLAP_MAX
-    rud_rad = rudder * FLAP_MAX
+    # Convert normalized commands to radians
+    flap_max = aircraft.actuators.flap_max
+    ail_rad = aileron * flap_max
+    ele_rad = elevator * flap_max
+    rud_rad = rudder * flap_max
 
     # Thrust for slipstream calculation
-    thrust = throttle * T_MAX
+    thrust = throttle * aircraft.propulsion.t_max
 
     # Compute forces from each segment
     # Note: aileron is positive for right roll (left aileron down, right up)
     # Note: elevator sign is already handled by cascade_pid.py (line 111)
     #       which negates the rate controller output for correct pitch response
+    segments = aircraft.segments
     F_wing_l, M_wing_l = compute_segment_forces(
-        WING_LEFT, v_body, omega, altitude, ail_rad, 0.0
+        segments.wing_left, v_body, omega, altitude, ail_rad, 0.0
     )
     F_wing_r, M_wing_r = compute_segment_forces(
-        WING_RIGHT, v_body, omega, altitude, -ail_rad, 0.0
+        segments.wing_right, v_body, omega, altitude, -ail_rad, 0.0
     )
     F_tail, M_tail = compute_segment_forces(
-        TAILPLANE, v_body, omega, altitude, ele_rad, thrust  # No negation - done by controller
+        segments.tailplane,
+        v_body,
+        omega,
+        altitude,
+        ele_rad,
+        thrust,  # No negation - done by controller
     )
     F_fin, M_fin = compute_segment_forces(
-        FIN, v_body, omega, altitude, rud_rad, thrust
+        segments.fin, v_body, omega, altitude, rud_rad, thrust
     )
     F_fuse, M_fuse = compute_segment_forces(
-        FUSELAGE, v_body, omega, altitude, 0.0, 0.0
+        segments.fuselage, v_body, omega, altitude, 0.0, 0.0
     )
 
     # Sum all contributions
