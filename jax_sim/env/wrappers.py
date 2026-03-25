@@ -10,6 +10,7 @@ from jax.random import PRNGKey
 
 from jax_sim.env.fixed_wing_target import EnvState, reset, step, get_obs
 from jax_sim.controllers.pid_gains import PIDConfig
+from jax_sim.physics.wind import WindConfig, DEFAULT_WIND_CONFIG
 
 
 def load_tuned_pid_config(config_path: str = "tuned_pid_config.json") -> PIDConfig:
@@ -52,7 +53,10 @@ def load_tuned_pid_config(config_path: str = "tuned_pid_config.json") -> PIDConf
     )
 
 
-def make_env(config_path: str = "tuned_pid_config.json") -> Dict:
+def make_env(
+    config_path: str = "tuned_pid_config.json",
+    wind_config: WindConfig = DEFAULT_WIND_CONFIG,
+) -> Dict:
     """Factory function to create environment with tuned PID config.
 
     Args:
@@ -73,6 +77,9 @@ def make_env(config_path: str = "tuned_pid_config.json") -> Dict:
         state, obs = env["reset_fn"](key)
         state, obs, reward, done, info = env["step_fn"](state, action, key)
     """
+    if wind_config is None:
+        wind_config = DEFAULT_WIND_CONFIG
+
     # Load base PID config
     try:
         base_pid_config = load_tuned_pid_config(config_path)
@@ -81,16 +88,18 @@ def make_env(config_path: str = "tuned_pid_config.json") -> Dict:
         print(f"Warning: {config_path} not found, using default PID config")
         base_pid_config = None
 
-    # Create partial reset function with base config
-    reset_fn = partial(reset, base_pid_config=base_pid_config)
+    # Create partial reset and step functions with fixed configs
+    reset_fn = partial(reset, base_pid_config=base_pid_config, wind_config=wind_config)
+    step_fn = partial(step, wind_config=wind_config)
 
     return {
         "reset_fn": reset_fn,
-        "step_fn": step,
+        "step_fn": step_fn,
         "get_obs_fn": get_obs,
         "obs_shape": (19,),
         "action_shape": (4,),
         "base_pid_config": base_pid_config,
+        "wind_config": wind_config,
     }
 
 
@@ -100,6 +109,7 @@ def auto_reset_step(
     action: jnp.ndarray,
     key: PRNGKey,
     base_pid_config: PIDConfig,
+    wind_config: WindConfig = DEFAULT_WIND_CONFIG,
 ) -> Tuple[EnvState, jnp.ndarray, float, bool, Dict]:
     """Step with automatic reset on episode termination.
 
@@ -132,10 +142,10 @@ def auto_reset_step(
     """
     # Step environment
     key_step, key_reset = jax.random.split(key)
-    next_state, obs, reward, done, info = step(state, action, key_step)
+    next_state, obs, reward, done, info = step(state, action, key_step, wind_config)
 
     # If done, reset (but keep terminal obs in info)
-    reset_state, reset_obs = reset(key_reset, base_pid_config)
+    reset_state, reset_obs = reset(key_reset, base_pid_config, wind_config)
 
     # Use jax.tree.map to conditionally select reset vs step state
     final_state = jax.tree.map(

@@ -33,6 +33,7 @@ except ImportError:
             pass
 
 from jax_sim.env.wrappers import make_env
+from jax_sim.physics.wind import create_wind_config
 from jax_sim.rl.models import Actor, Critic
 from jax_sim.rl.config import PPOConfig
 from jax_sim.rl.buffers import RolloutBuffer, EpisodeStats
@@ -232,7 +233,23 @@ def train(config: PPOConfig, run_name: str):
 
     # Environment setup
     print("Loading environment...")
-    env_dict = make_env("tuned_pid_config.json")
+    wind_config = create_wind_config(
+        steady_wind_ned=jnp.array([config.wind_north, config.wind_east, config.wind_down]),
+        enable_gust=config.wind_enable_gust,
+        gust_direction_ned=jnp.array(
+            [config.wind_gust_dir_north, config.wind_gust_dir_east, config.wind_gust_dir_down]
+        ),
+        gust_magnitude=config.wind_gust_magnitude,
+        gust_start_time=config.wind_gust_start,
+        gust_rise_time=config.wind_gust_rise,
+        gust_hold_time=config.wind_gust_hold,
+        enable_turbulence=config.wind_enable_turbulence,
+        turbulence_sigma=jnp.array([config.wind_sigma_u, config.wind_sigma_v, config.wind_sigma_w]),
+        turbulence_length_scale=jnp.array(
+            [config.wind_length_u, config.wind_length_v, config.wind_length_w]
+        ),
+    )
+    env_dict = make_env("tuned_pid_config.json", wind_config=wind_config)
 
     # Vectorize environment functions
     vec_reset = jax.vmap(env_dict["reset_fn"])

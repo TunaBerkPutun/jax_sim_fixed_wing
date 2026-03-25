@@ -21,6 +21,7 @@ def compute_aircraft_forces_moments(
     state,
     current_actuators,
     aircraft: AircraftParams = DEFAULT_AIRCRAFT,
+    wind_body: jnp.ndarray = jnp.zeros(3),
 ):
     """Compute total aerodynamic forces and moments.
 
@@ -41,7 +42,7 @@ def compute_aircraft_forces_moments(
     Returns:
         Total_F_body: Total force in body frame [Fx, Fy, Fz] [N]
         Total_M_body: Total moment in body frame [Mx, My, Mz] [Nm]
-        v_body: Velocity in body frame [u, v, w] [m/s]
+        v_body: Air-relative velocity in body frame [u, v, w] [m/s]
     """
     # State unpack
     omega = state[10:13]  # p, q, r [rad/s]
@@ -49,7 +50,8 @@ def compute_aircraft_forces_moments(
 
     # Convert earth-frame velocity to body frame (v_body)
     quat_inv_val = quat_inv(state[6:10])
-    v_body = rotate_vec_by_quat(quat_inv_val, state[3:6])
+    v_body_ground = rotate_vec_by_quat(quat_inv_val, state[3:6])
+    v_body = v_body_ground - wind_body
 
     # Actuators (radians for surfaces, 0-1 for throttle)
     # Convert radians back to normalized [-1, 1] for new aero model
@@ -89,9 +91,10 @@ def get_forces_and_moments(
     state,
     current_actuators,
     aircraft: AircraftParams = DEFAULT_AIRCRAFT,
+    wind_body: jnp.ndarray = jnp.zeros(3),
 ):
     """Backwards-compatible wrapper for aircraft-specific forces/moments."""
-    return compute_aircraft_forces_moments(state, current_actuators, aircraft)
+    return compute_aircraft_forces_moments(state, current_actuators, aircraft, wind_body)
 
 
 @jax.jit
@@ -122,6 +125,7 @@ def equations_of_motion(
     user_commands,
     dt: float = 0.004,
     aircraft: AircraftParams = DEFAULT_AIRCRAFT,
+    wind_body: jnp.ndarray = jnp.zeros(3),
 ):
     """Simulate one timestep of the aircraft dynamics.
 
@@ -130,6 +134,7 @@ def equations_of_motion(
         user_commands: [ail_cmd, ele_cmd, rud_cmd, thr_cmd] (-1 to 1)
         dt: Timestep (seconds)
         aircraft: Aircraft configuration (mass, inertia, limits)
+        wind_body: Wind velocity in body frame [u, v, w] [m/s]
 
     Returns:
         next_state: Updated state vector
@@ -145,6 +150,7 @@ def equations_of_motion(
         state,
         current_actuators,
         aircraft=aircraft,
+        wind_body=wind_body,
     )
 
     # Rigid-body integration (physics-only)

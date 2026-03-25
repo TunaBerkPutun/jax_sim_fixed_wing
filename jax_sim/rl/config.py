@@ -42,6 +42,26 @@ class PPOConfig:
     save_interval: int = 100  # Save checkpoint every N updates
     use_wandb: bool = False  # Enable Weights & Biases logging
 
+    # Wind/disturbance settings
+    wind_north: float = 0.0
+    wind_east: float = 0.0
+    wind_down: float = 0.0
+    wind_enable_gust: bool = False
+    wind_gust_magnitude: float = 0.0
+    wind_gust_start: float = 5.0
+    wind_gust_rise: float = 2.0
+    wind_gust_hold: float = 2.0
+    wind_gust_dir_north: float = 1.0
+    wind_gust_dir_east: float = 0.0
+    wind_gust_dir_down: float = 0.0
+    wind_enable_turbulence: bool = False
+    wind_sigma_u: float = 1.0
+    wind_sigma_v: float = 1.0
+    wind_sigma_w: float = 0.5
+    wind_length_u: float = 200.0
+    wind_length_v: float = 200.0
+    wind_length_w: float = 50.0
+
     # System
     seed: int = 42  # Random seed
 

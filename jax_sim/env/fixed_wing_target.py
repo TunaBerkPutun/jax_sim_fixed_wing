@@ -21,6 +21,13 @@ from jax_sim.env.domain_randomization import (
 from jax_sim.env.observation import get_observation
 from jax_sim.env.reward import compute_reward
 from jax_sim.env.termination import check_termination
+from jax_sim.physics.wind import (
+    WindConfig,
+    DEFAULT_WIND_CONFIG,
+    compute_total_wind_ned,
+    step_wind_model,
+    wind_ned_to_body,
+)
 
 
 # Environment constants
@@ -51,11 +58,17 @@ class EnvState(NamedTuple):
     pid_config: PIDConfig      # PID gains (randomized per episode)
     time: float                # elapsed time [seconds]
     last_action: jnp.ndarray   # (4,) previous action for smoothness
+    wind_ned: jnp.ndarray      # (3,) current total wind in NED frame [m/s]
+    turbulence_ned: jnp.ndarray  # (3,) turbulence filter state [m/s]
     key: PRNGKey               # RNG state for stochasticity
 
 
 @jax.jit
-def reset(key: PRNGKey, base_pid_config: PIDConfig = None) -> Tuple[EnvState, jnp.ndarray]:
+def reset(
+    key: PRNGKey,
+    base_pid_config: PIDConfig = None,
+    wind_config: WindConfig = DEFAULT_WIND_CONFIG,
+) -> Tuple[EnvState, jnp.ndarray]:
     """Reset environment to initial state with domain randomization.
 
     Args:
@@ -96,7 +109,8 @@ def reset(key: PRNGKey, base_pid_config: PIDConfig = None) -> Tuple[EnvState, jn
     pid_config = randomize_pid_config(base_pid_config, key_pid)
 
     # Randomize physics params (currently not used, but available for future)
-    phys_params = randomize_physics_params(key_phys)
+    _phys_params = randomize_physics_params(key_phys)
+    del _phys_params
 
     # Initialize aircraft state (fixed initial conditions)
     plane_state = jnp.concatenate([
@@ -112,6 +126,8 @@ def reset(key: PRNGKey, base_pid_config: PIDConfig = None) -> Tuple[EnvState, jn
 
     # Initial action (neutral)
     last_action = jnp.zeros(4)
+    turbulence_ned = jnp.zeros(3)
+    wind_ned = compute_total_wind_ned(0.0, turbulence_ned, wind_config)
 
     # Create environment state
     env_state = EnvState(
@@ -122,6 +138,8 @@ def reset(key: PRNGKey, base_pid_config: PIDConfig = None) -> Tuple[EnvState, jn
         pid_config=pid_config,
         time=0.0,
         last_action=last_action,
+        wind_ned=wind_ned,
+        turbulence_ned=turbulence_ned,
         key=key,
     )
 
@@ -136,6 +154,7 @@ def step(
     state: EnvState,
     action: jnp.ndarray,
     key: PRNGKey,
+    wind_config: WindConfig = DEFAULT_WIND_CONFIG,
 ) -> Tuple[EnvState, jnp.ndarray, float, bool, Dict]:
     """Step environment forward one timestep.
 
@@ -180,8 +199,22 @@ def step(
         setpoints, state.plane_state, state.pid_state, state.pid_config, DT
     )
 
-    # 3. Step physics
-    next_plane_state = equations_of_motion(state.plane_state, actuators, DT)
+    # 3. Step wind and physics
+    new_turbulence_ned, wind_ned = step_wind_model(
+        plane_state=state.plane_state,
+        turbulence_ned=state.turbulence_ned,
+        time=state.time,
+        key=key,
+        dt=DT,
+        wind_config=wind_config,
+    )
+    wind_body = wind_ned_to_body(state.plane_state[6:10], wind_ned)
+    next_plane_state = equations_of_motion(
+        state.plane_state,
+        actuators,
+        DT,
+        wind_body=wind_body,
+    )
 
     # 4. Compute reward (dense shaping + terminal)
     step_reward, reward_info = compute_reward(
@@ -212,6 +245,8 @@ def step(
         pid_config=state.pid_config,  # Config doesn't change during episode
         time=state.time + DT,
         last_action=action,
+        wind_ned=wind_ned,
+        turbulence_ned=new_turbulence_ned,
         key=key,
     )
 

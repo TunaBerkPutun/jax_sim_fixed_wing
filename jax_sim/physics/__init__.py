@@ -37,6 +37,17 @@ from jax_sim.physics.dynamics import (
 )
 from jax_sim.physics.rigid_body import rigid_body_step
 from jax_sim.physics.simulator import simulate, simulate_batch
+from jax_sim.physics.wind import (
+    WindConfig,
+    create_wind_config,
+    DEFAULT_WIND_CONFIG,
+    one_minus_cosine_gust_scale,
+    compute_gust_ned,
+    update_dryden_turbulence,
+    compute_total_wind_ned,
+    step_wind_model,
+    wind_ned_to_body,
+)
 
 __all__ = [
     # Constants
@@ -76,4 +87,14 @@ __all__ = [
     "rigid_body_step",
     "simulate",
     "simulate_batch",
+    # Wind
+    "WindConfig",
+    "create_wind_config",
+    "DEFAULT_WIND_CONFIG",
+    "one_minus_cosine_gust_scale",
+    "compute_gust_ned",
+    "update_dryden_turbulence",
+    "compute_total_wind_ned",
+    "step_wind_model",
+    "wind_ned_to_body",
 ]
