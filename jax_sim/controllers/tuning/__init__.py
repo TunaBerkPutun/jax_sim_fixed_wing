@@ -12,6 +12,13 @@ from jax_sim.controllers.tuning.es_tuner import (
     TuningResult,
 )
 from jax_sim.controllers.tuning.model_tuner import run_model_tuning_rate
+from jax_sim.controllers.tuning.expert_tuner import (
+    design_attitude_tau,
+    design_npfg_defaults,
+    design_rate_gains,
+    design_tecs_gains,
+    tune_expert,
+)
 
 __all__ = [
     "evaluate_pid_config",
@@ -22,4 +29,10 @@ __all__ = [
     "run_es_tuning",
     "run_model_tuning_rate",
     "TuningResult",
+    # Expert cascade tuner
+    "design_rate_gains",
+    "design_attitude_tau",
+    "design_tecs_gains",
+    "design_npfg_defaults",
+    "tune_expert",
 ]

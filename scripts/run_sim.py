@@ -7,7 +7,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from jax_sim.physics.dynamics import equations_of_motion
+from jax_sim.vehicles.fixed_wing.tier1 import equations_of_motion
 from jax_sim.logging.csv_logger import save_trajectory_csv
 from jax_sim.viz.plots import load_log, plot_summary
 

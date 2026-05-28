@@ -6,7 +6,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from jax_sim.env.wrappers import make_env
-from jax_sim.physics.dynamics import compute_aircraft_forces_moments
+from jax_sim.vehicles.fixed_wing.tier1 import compute_aircraft_forces_moments
 from jax_sim.physics.wind import create_wind_config, compute_total_wind_ned, step_wind_model
 
 

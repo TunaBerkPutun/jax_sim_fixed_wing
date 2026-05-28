@@ -1,42 +1,14 @@
-"""Physics simulation modules."""
+"""Vehicle-agnostic physics primitives (spec §6).
 
-from jax_sim.physics.constants import (
-    G, RHO, MASS,
-    Ixx, Iyy, Izz, Inertia, Inertia_inv,
-    WING_SPAN, CHORD, WING_AREA, TAIL_DIST,
-    TAU_SERVO, TAU_MOTOR,
-    SEGMENTS,
-    T_MAX, PROP_RADIUS,
-    WING_LEFT, WING_RIGHT, TAILPLANE, FIN, FUSELAGE,
-)
-from jax_sim.physics.aircraft import (
-    EnvironmentParams,
-    MassProps,
-    ActuatorParams,
-    PropulsionParams,
-    AeroSegments,
-    AircraftParams,
-    create_default_aircraft,
-    DEFAULT_AIRCRAFT,
-)
-from jax_sim.physics.aerodynamics import compute_aero_segment, compute_fixed_wing_aero
-from jax_sim.physics.aero_segment import (
-    AeroSegmentParams,
-    compute_segment_forces,
-    create_wing_left,
-    create_wing_right,
-    create_tailplane,
-    create_fin,
-    create_fuselage,
-)
-from jax_sim.physics.dynamics import (
-    compute_aircraft_forces_moments,
-    equations_of_motion,
-    get_forces_and_moments,
-    update_actuators,
-)
+After the §18 / §A.5 restructure this package contains only what every
+vehicle needs: physical constants, vehicle-agnostic dataclasses, the
+rigid-body integrator, and the wind model. Vehicle-specific aero, params,
+and integrators live under `jax_sim.vehicles.<type>`.
+"""
+
+from jax_sim.physics.constants import G, RHO
+from jax_sim.physics.dataclasses import EnvironmentParams, MassProps
 from jax_sim.physics.rigid_body import rigid_body_step
-from jax_sim.physics.simulator import simulate, simulate_batch
 from jax_sim.physics.wind import (
     WindConfig,
     create_wind_config,
@@ -50,43 +22,13 @@ from jax_sim.physics.wind import (
 )
 
 __all__ = [
-    # Constants
-    "G", "RHO", "MASS",
-    "Ixx", "Iyy", "Izz", "Inertia", "Inertia_inv",
-    "WING_SPAN", "CHORD", "WING_AREA", "TAIL_DIST",
-    "TAU_SERVO", "TAU_MOTOR",
-    "SEGMENTS",
-    "T_MAX", "PROP_RADIUS",
-    # Segment definitions
-    "WING_LEFT", "WING_RIGHT", "TAILPLANE", "FIN", "FUSELAGE",
-    # Structured aircraft configs
+    # Physical constants
+    "G", "RHO",
+    # Vehicle-agnostic dataclasses
     "EnvironmentParams",
     "MassProps",
-    "ActuatorParams",
-    "PropulsionParams",
-    "AeroSegments",
-    "AircraftParams",
-    "create_default_aircraft",
-    "DEFAULT_AIRCRAFT",
-    # Aerodynamics
-    "AeroSegmentParams",
-    "compute_segment_forces",
-    "compute_aero_segment",  # Deprecated
-    "compute_fixed_wing_aero",
-    # Segment factories
-    "create_wing_left",
-    "create_wing_right",
-    "create_tailplane",
-    "create_fin",
-    "create_fuselage",
-    # Dynamics
-    "compute_aircraft_forces_moments",
-    "equations_of_motion",
-    "get_forces_and_moments",
-    "update_actuators",
+    # Integrator
     "rigid_body_step",
-    "simulate",
-    "simulate_batch",
     # Wind
     "WindConfig",
     "create_wind_config",

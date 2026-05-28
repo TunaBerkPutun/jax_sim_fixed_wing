@@ -1,0 +1,11 @@
+Aero validation suite — independent maneuver tests
+trim = (0.0, 0.0758, 0.0, 0.3792), alpha=-0.843deg, dt=0.004
+
+  trim_hold           dur= 30.0s  dh=  0.50m  dV= 0.10m/s  dtheta=  0.15deg  dphi=  0.00deg  dq=  0.51d/s
+  elev_doublet_sm     dur= 25.0s  dh=  0.39m  dV= 0.10m/s  dtheta=  0.17deg  dphi=  0.00deg  dq=  0.69d/s
+  elev_doublet_lg     dur= 15.0s  dh=  0.24m  dV= 0.12m/s  dtheta=  0.31deg  dphi=  0.00deg  dq=  1.74d/s
+  ail_doublet         dur= 15.0s  dh=  0.91m  dV= 0.13m/s  dtheta=  0.47deg  dphi=  1.60deg  dq=  0.85d/s
+  rud_doublet         dur= 15.0s  dh=  0.20m  dV= 0.10m/s  dtheta=  0.15deg  dphi=  0.15deg  dq=  0.73d/s
+  ail_step_small      dur=  8.0s  dh=  0.33m  dV= 0.30m/s  dtheta=  0.41deg  dphi=  0.39deg  dq=  1.16d/s
+  throttle_step       dur= 20.0s  dh= 12.91m  dV= 0.28m/s  dtheta=  4.26deg  dphi=  0.04deg  dq=  0.87d/s
+  elev_chirp          dur= 30.0s  dh=  0.34m  dV= 0.11m/s  dtheta=  0.26deg  dphi=  0.00deg  dq=  1.38d/s

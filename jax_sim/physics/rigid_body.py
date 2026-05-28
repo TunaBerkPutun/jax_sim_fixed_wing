@@ -5,7 +5,7 @@ from __future__ import annotations
 import jax
 import jax.numpy as jnp
 
-from jax_sim.physics.aircraft import EnvironmentParams, MassProps
+from jax_sim.physics.dataclasses import EnvironmentParams, MassProps
 from jax_sim.utils.quaternion import quat_derivative, rotate_vec_by_quat
 
 

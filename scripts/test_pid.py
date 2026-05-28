@@ -11,7 +11,7 @@ import jax.numpy as jnp
 import numpy as np
 import matplotlib.pyplot as plt
 
-from jax_sim.physics.dynamics import equations_of_motion
+from jax_sim.vehicles.fixed_wing.tier1 import equations_of_motion
 from jax_sim.controllers import (
     cascade_pid_step,
     create_pid_config,
@@ -19,7 +19,7 @@ from jax_sim.controllers import (
     PIDConfig,
     PIDState,
 )
-from jax_sim.controllers.attitude.pid import attitude_controller
+from jax_sim.controllers.fixed_wing.attitude.pid import attitude_controller
 from jax_sim.controllers.tuning.es_tuner import load_tuned_config
 from jax_sim.utils.quaternion import quat_to_euler_jax
 from jax_sim.logging.csv_logger import save_trajectory_csv

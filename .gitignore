@@ -12,3 +12,13 @@ runs/
 checkpoints/
 pid_debug/
 px4_sih/
+
+# Nested third-party repos (have their own .git)
+PX4-Autopilot/
+AeroSandbox/
+
+# Generated artifacts at repo root
+*.png
+jax_log.csv
+jsbsim_log.csv
+sim_log.csv

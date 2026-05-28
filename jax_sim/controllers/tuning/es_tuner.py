@@ -30,7 +30,7 @@ from jax_sim.controllers.tuning.loss import (
     N_PARAMS,
     N_RATE_PARAMS,
 )
-from jax_sim.controllers.pid_gains import PIDConfig
+from jax_sim.controllers.fixed_wing.pid_gains import PIDConfig
 from jax_sim.logging.csv_logger import save_rate_debug_csv
 
 

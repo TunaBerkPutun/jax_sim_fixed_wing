@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 from jax import random
 
-from jax_sim.controllers.pid_gains import PIDConfig, create_pid_config
+from jax_sim.controllers.fixed_wing.pid_gains import PIDConfig, create_pid_config
 from jax_sim.controllers.tuning.es_tuner import TuningResult
 from jax_sim.controllers.tuning.loss import (
     RATE_PARAM_BOUNDS,
@@ -14,8 +14,8 @@ from jax_sim.controllers.tuning.loss import (
     config_to_rate_params,
     evaluate_rate_config,
 )
-from jax_sim.physics.aircraft import DEFAULT_AIRCRAFT
-from jax_sim.physics.dynamics import get_forces_and_moments
+from jax_sim.vehicles.fixed_wing.presets import DEFAULT_AIRCRAFT
+from jax_sim.vehicles.fixed_wing.tier1 import get_forces_and_moments
 
 FLAP_MAX = DEFAULT_AIRCRAFT.actuators.flap_max
 INERTIA = DEFAULT_AIRCRAFT.mass_props.inertia

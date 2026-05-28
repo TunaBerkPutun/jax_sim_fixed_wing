@@ -10,9 +10,9 @@ import jax
 import jax.numpy as jnp
 from jax.random import PRNGKey
 
-from jax_sim.physics.dynamics import equations_of_motion
-from jax_sim.controllers.cascade_pid import cascade_pid_step
-from jax_sim.controllers.pid_gains import PIDConfig, PIDState, create_pid_state
+from jax_sim.vehicles.fixed_wing.tier1 import equations_of_motion
+from jax_sim.controllers.fixed_wing.cascade_pid import cascade_pid_step
+from jax_sim.controllers.fixed_wing.pid_gains import PIDConfig, PIDState, create_pid_state
 from jax_sim.env.domain_randomization import (
     randomize_target,
     randomize_pid_config,

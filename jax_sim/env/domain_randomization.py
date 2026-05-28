@@ -12,7 +12,7 @@ import jax
 import jax.numpy as jnp
 from jax.random import PRNGKey
 
-from jax_sim.controllers.pid_gains import PIDConfig
+from jax_sim.controllers.fixed_wing.pid_gains import PIDConfig
 
 
 @jax.jit
